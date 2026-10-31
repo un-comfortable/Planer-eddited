@@ -7,7 +7,6 @@
 - 사진 인증 필수 설정
 - 매일 12시 자동 정산, 각자 정한 시간에 인증 알림
 - 월 1회 휴식권, 참가자 투표로 정하는 면책
-- 공부방(음성 채널) 입장/퇴장 알림과 오늘 공부 시간
 
 ## 명령어
 
@@ -129,9 +128,7 @@ cp .env.example .env
 | 항목 | 내용 |
 |---|---|
 | `TOKEN` | 디스코드 봇 토큰 |
-| `TARGET_CHANNEL` | 공부방 음성 채널 ID |
 | `ALERT_CHANNEL` | 정산 결과와 인증 알림을 올릴 채널 ID |
-| `TEST_CHANNEL` | 공부방 입장/퇴장, 공부 시간을 올릴 채널 ID |
 | `WELCOME_CHANNEL` | 새 멤버 환영 메시지를 올릴 채널 ID |
 | `FIREBASE_CREDENTIALS` | 서비스 계정 키 파일 경로 (예: `/home/ubuntu/secrets/planer-bot.json`) |
 | `FIREBASE_PROJECT_ID` | 비우면 `planer-f8cb7` |
@@ -169,7 +166,6 @@ cp -r ~/TonkatsuBot ~/TonkatsuBot-backup            # 2. 백업
 cd ~/Planer-eddited/bot
 venv/bin/python tools/migrate_json_to_firestore.py --data-dir ~/TonkatsuBot --dry-run   # 3. 개수 확인
 venv/bin/python tools/migrate_json_to_firestore.py --data-dir ~/TonkatsuBot             # 4. 옮기기
-cp ~/TonkatsuBot/study_times.json ~/TonkatsuBot/active_sessions.json . 2>/dev/null      # 5. 공부 시간 파일
 ```
 
 - 문서 ID가 고정 규칙이라 여러 번 실행해도 중복되지 않습니다.
@@ -227,7 +223,6 @@ npm run test:bot
 | 위치 | 내용 |
 |---|---|
 | Firestore `plans`, `checkIns`, `offDays`, `fineEvents`, `members`, `votes` | 공용 데이터 |
-| `bot/study_times.json`, `bot/active_sessions.json` | 공부방 시간 (나중에 앱 공부 기록으로 옮길 예정) |
 
 - **자동 백업:** 하루 한 번 `backups/날짜/firestore.json`에 공용 데이터 전체를 내려받고, 최근 14일치를 보관합니다.
 - 벌금은 건마다 `fineEvents`에 "언제, 왜, 얼마"가 남습니다.

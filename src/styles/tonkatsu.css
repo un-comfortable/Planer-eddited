@@ -29,3 +29,46 @@
 .tk-add-row input:not([type]) { flex: 1; min-width: 180px; }
 .tk-days { display: flex; gap: 6px; }
 .tk-edit { flex-basis: 100%; margin-top: 6px; }
+
+/* 입력 칸: 다른 버튼들과 같은 모양 (둥근 모서리 8px, 연한 테두리, 보라색 포커스) */
+.tk select,
+.tk input[type="text"], .tk input:not([type]), .tk input[type="number"], .tk input[type="date"] {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tk select {
+  appearance: none;
+  padding-right: 34px;
+  cursor: pointer;
+  font-weight: 600;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+.tk select:hover, .tk input:hover { border-color: #c7d2fe; }
+.tk select:focus, .tk input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.tk select:disabled, .tk input:disabled { opacity: 0.55; cursor: not-allowed; }
+.tk-add-row input[type="number"] { width: 4.8em; padding: 0 8px; text-align: center; }
+.tk-add-row > label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--text-muted); }
+
+/* 체크박스·요일: 누르는 알약 버튼 */
+.tk .tk-check {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-muted);
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; user-select: none;
+  transition: all 0.15s;
+}
+.tk .tk-check:hover { border-color: #c7d2fe; color: var(--primary-dark); }
+.tk .tk-check input { accent-color: var(--primary); margin: 0; cursor: pointer; }
+.tk .tk-check:has(input:checked) { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
+.tk .tk-check:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--primary-light); }
+.tk .tk-day { position: relative; width: 38px; padding: 0; justify-content: center; }
+.tk .tk-day input { position: absolute; opacity: 0; pointer-events: none; }
+.tk-days { gap: 4px; }

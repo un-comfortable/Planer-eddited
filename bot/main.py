@@ -32,9 +32,7 @@ def get_id_env(name):
     except ValueError:
         raise RuntimeError(f".env 파일의 {name} 값은 숫자 ID여야 합니다. (현재 값: {value!r})")
 
-TARGET_CHANNEL = get_id_env('TARGET_CHANNEL')
 ALERT_CHANNEL = get_id_env('ALERT_CHANNEL')
-TEST_CHANNEL = get_id_env('TEST_CHANNEL')
 WELCOME_CHANNEL = get_id_env('WELCOME_CHANNEL')
 
 # 입력 글자 수 제한 (디스코드 표시 제한을 넘지 않도록)
@@ -73,26 +71,10 @@ intents = discord.Intents.default()
 # 슬래시 명령어만 쓰므로 message_content 권한은 필요 없음
 # members는 개발자 포털에서 "Server Members Intent"를 켜야 함
 intents.members = True
-intents.voice_states = True
 
 bot = TonkatsuBot(command_prefix='!', intents=intents, tree_cls=TonkatsuTree)
 
-#파일 저장/불러오기 (공부방 시간 측정용. 계획·인증 데이터는 Firestore)
-def load_json_file(path, default):
-    """JSON 파일을 읽음. 파일이 깨졌으면 원본을 백업해 두고 default로 시작함."""
-    if not path.exists():
-        return default
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, UnicodeDecodeError) as e:
-        stamp = core.get_now().strftime('%Y%m%d-%H%M%S')
-        backup = path.with_name(f"{path.name}.broken-{stamp}")
-        shutil.copy2(path, backup)
-        print(f"🚨 {path.name} 파일이 손상되어 읽을 수 없습니다 ({e}).")
-        print(f"🚨 원본을 {backup.name} 으로 백업하고 빈 값으로 시작합니다.")
-        return default
-
+#파일 저장 (백업용. 계획·인증 데이터는 Firestore)
 def _atomic_write_text(path, text):
     # 임시 파일에 다 쓴 다음 한 번에 교체 → 저장 도중 꺼져도 기존 파일이 깨지지 않음
     tmp = path.with_name(path.name + ".tmp")
@@ -101,57 +83,6 @@ def _atomic_write_text(path, text):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
-
-async def write_json_file(path, data, lock):
-    text = json.dumps(data, indent=4, ensure_ascii=False)
-    async with lock:
-        await asyncio.get_running_loop().run_in_executor(None, _atomic_write_text, path, text)
-
-#공부 시간 관리
-TIME_FILE = BASE_DIR / "study_times.json"
-time_lock = asyncio.Lock()
-last_reset_date_str = ""
-
-def load_time_data():
-    global last_reset_date_str
-    raw_data = load_json_file(TIME_FILE, {})
-    try:
-        if "users" not in raw_data:
-            return {int(k): v for k, v in raw_data.items()}
-        last_reset_date_str = raw_data.get("last_date", "")
-        return {int(k): v for k, v in raw_data["users"].items()}
-    except (ValueError, TypeError, AttributeError) as e:
-        print(f"⚠️ {TIME_FILE.name} 내용 형식이 이상해서 빈 값으로 시작합니다: {e}")
-        return {}
-
-async def save_time_data(data):
-    await write_json_file(TIME_FILE, {"last_date": last_reset_date_str, "users": data}, time_lock)
-
-async def try_reset_daily_study():
-    """하루 기준(새벽 5시)이 바뀌었으면 오늘 공부 시간을 초기화"""
-    global last_reset_date_str
-    current_study_date = day_str(core.get_base_date())
-    if last_reset_date_str != current_study_date:
-        print(f"🔄 날짜 변경 감지! ({last_reset_date_str} -> {current_study_date}) 공부 시간을 초기화합니다.")
-        daily_study_times.clear()
-        last_reset_date_str = current_study_date
-        await save_time_data(daily_study_times)
-        return True
-    return False
-
-SESSION_FILE = BASE_DIR / "active_sessions.json"
-session_lock = asyncio.Lock()
-
-def load_session_data():
-    data = load_json_file(SESSION_FILE, {})
-    try:
-        return {int(uid): datetime.fromtimestamp(ts, core.KST) for uid, ts in data.items()}
-    except (ValueError, TypeError, AttributeError, OSError) as e:
-        print(f"⚠️ {SESSION_FILE.name} 내용 형식이 이상해서 빈 값으로 시작합니다: {e}")
-        return {}
-
-async def save_session_data(data):
-    await write_json_file(SESSION_FILE, {str(uid): dt.timestamp() for uid, dt in data.items()}, session_lock)
 
 #정산·백업 기록 (Firestore botState/state)
 async def load_state():
@@ -242,10 +173,6 @@ DATE_CHOICES = [
     app_commands.Choice(name="어제 (깜빡한 인증)", value="yesterday"),
 ]
 
-#공부 시간 측정
-study_sessions = {}
-daily_study_times = {}
-
 def alert_guild():
     channel = bot.get_channel(ALERT_CHANNEL)
     return channel.guild if channel else None
@@ -267,7 +194,7 @@ first_ready_done = False
 async def on_ready():
     # on_ready는 연결이 끊겼다 다시 붙을 때도 실행됨
     # 명령어 동기화와 투표 버튼 복구는 처음 한 번만 (디스코드 요청 제한 방지)
-    global daily_study_times, study_sessions, first_ready_done
+    global first_ready_done
     is_first_ready = not first_ready_done
     first_ready_done = True
 
@@ -290,42 +217,6 @@ async def on_ready():
                     except Exception:
                         traceback.print_exc()
 
-    daily_study_times = load_time_data()
-    study_sessions = load_session_data()
-    await try_reset_daily_study()
-
-    print(f"📂 공부 시간 데이터 복구: {len(daily_study_times)}명")
-    print(f"📂 진행 중인 세션 복구: {len(study_sessions)}명")
-
-    target_channel = bot.get_channel(TARGET_CHANNEL)
-    if target_channel:
-        current_member_ids = [m.id for m in target_channel.members if not m.bot]
-
-        # A. 파일엔 있는데 실제 방엔 없는 사람 → 퇴장 처리
-        ghost_users = []
-        for user_id in list(study_sessions.keys()):
-            if user_id not in current_member_ids:
-                ghost_users.append(user_id)
-                start_time = study_sessions.pop(user_id)
-                seconds = int((core.get_now() - start_time).total_seconds())
-                daily_study_times[user_id] = daily_study_times.get(user_id, 0) + seconds
-                print(f"👻 유령 세션 정리됨: ID {user_id} (+{seconds}초)")
-
-        # B. 실제 방엔 있는데 파일엔 없는 사람 (봇 꺼진 사이에 들어온 사람) → 입장 처리
-        new_users = 0
-        for member_id in current_member_ids:
-            if member_id not in study_sessions:
-                study_sessions[member_id] = core.get_now()
-                new_users += 1
-                print(f"🧟 미등록 세션 복구됨: ID {member_id}")
-
-        if ghost_users or new_users > 0:
-            await save_session_data(study_sessions)
-            await save_time_data(daily_study_times)
-            print(f"✨ 정리 완료: 유령 {len(ghost_users)}명 퇴치, 미등록 {new_users}명 등록")
-    else:
-        print("⚠️ 경고: TARGET_CHANNEL을 찾을 수 없습니다. 유령 세션 정리를 건너뜁니다.")
-
     for msg_id, data in (list(store.data["votes"].items()) if is_first_ready else []):
         try:
             req_votes = data.get("required_votes", 2)
@@ -344,8 +235,8 @@ async def on_ready():
         except Exception as e:
             print(f"⚠️ 투표 복구 실패 (ID: {msg_id}): {e}")
 
-    if not check_study_status.is_running():
-        check_study_status.start()
+    if not hourly_check.is_running():
+        hourly_check.start()
 
     print(f'로그인 성공! {bot.user} 봇이 준비되었습니다.')
 
@@ -1111,7 +1002,7 @@ async def link_app(interaction: discord.Interaction, 코드: str = None, 동작:
            else "❌ 코드를 찾을 수 없어요. 앱에 보이는 8자리 코드를 그대로 입력했는지 확인해주세요.")
     await interaction.response.send_message(msg, ephemeral=True)
 
-#자동 백업 (하루 한 번, backups/날짜/ 폴더에 Firestore 공용 데이터와 공부 시간 파일 저장)
+#자동 백업 (하루 한 번, backups/날짜/ 폴더에 Firestore 공용 데이터 저장)
 BACKUP_DIR = BASE_DIR / "backups"
 BACKUP_KEEP_DAYS = 14  # 최근 14일치만 보관
 
@@ -1119,9 +1010,6 @@ def _write_backup(date_str, exported):
     folder = BACKUP_DIR / date_str
     folder.mkdir(parents=True, exist_ok=True)
     _atomic_write_text(folder / "firestore.json", json.dumps(exported, indent=2, ensure_ascii=False))
-    for path in (TIME_FILE, SESSION_FILE):
-        if path.exists():
-            shutil.copy2(path, folder / path.name)
 
     # 오래된 백업 삭제 (날짜 이름 폴더만 대상)
     dated = sorted(p for p in BACKUP_DIR.iterdir() if p.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.name))
@@ -1140,20 +1028,13 @@ async def run_daily_backup(now):
 
 #감시자
 @tasks.loop(minutes=60)
-async def check_study_status():
+async def hourly_check():
     # 각 단계를 따로 감싸서, 한 곳에서 오류가 나도 반복 작업 자체는 멈추지 않게 함
     try:
         restarted = store.ensure_watching()
         if restarted:
             print(f"🔁 Firestore 실시간 연결 재시작: {', '.join(restarted)}")
     except Exception:
-        traceback.print_exc()
-
-    try:
-        if await try_reset_daily_study():
-            print("🌅 지능형 초기화 완료: 새로운 하루가 시작되었습니다.")
-    except Exception:
-        print("🚨 공부 시간 초기화 중 오류:")
         traceback.print_exc()
 
     now = core.get_now()
@@ -1270,8 +1151,8 @@ async def send_hourly_alerts(channel, now):
         await send_long_message(channel, msg)
 
 #정각 대기
-@check_study_status.before_loop
-async def before_check_study_status():
+@hourly_check.before_loop
+async def before_hourly_check():
     await bot.wait_until_ready()
     now = core.get_now()
     future = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
@@ -1329,42 +1210,6 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             await interaction.response.send_message(msg, ephemeral=True)
     except discord.HTTPException:
         pass
-
-#공부 시간 측정
-@bot.event
-async def on_voice_state_update(member, before, after):
-    alert_channel = bot.get_channel(TEST_CHANNEL)
-
-    if member.bot or before.channel == after.channel:
-        return
-
-    #입장
-    if after.channel is not None and after.channel.id == TARGET_CHANNEL:
-        study_sessions[member.id] = core.get_now()
-        await save_session_data(study_sessions)
-        if alert_channel:
-            await alert_channel.send(f"✅ {member.display_name}님이 공부방에 입장했습니다!")
-    #퇴장
-    elif before.channel is not None and before.channel.id == TARGET_CHANNEL and (after.channel is None or after.channel.id != TARGET_CHANNEL):
-        if member.id in study_sessions:
-            if alert_channel:
-                await alert_channel.send(f"🛑 {member.display_name}님이 공부방에서 퇴장했습니다!")
-
-            start_time = study_sessions.pop(member.id)
-            seconds = int((core.get_now() - start_time).total_seconds())
-            await save_session_data(study_sessions)
-
-            current_total = daily_study_times.get(member.id, 0) + seconds
-            daily_study_times[member.id] = current_total
-            await save_time_data(daily_study_times)
-
-            def fmt(s):
-                h, r = divmod(s, 3600)
-                m, s = divmod(r, 60)
-                return f"{h}시간 {m}분 {s}초"
-
-            if alert_channel:
-                await alert_channel.send(f"⏱️ 이번 시간: **{fmt(seconds)}**\n📚 오늘 총합: **{fmt(current_total)}**")
 
 #칭찬
 @bot.tree.command(name="칭찬", description="무작위 칭찬 멘트로 자존감을 채워줍니다!")

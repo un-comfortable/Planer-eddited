@@ -42,15 +42,15 @@ function AddPlanForm({ discordId, today, onDone, run }) {
       <input value={form.content} maxLength={80} placeholder="내용 (예: 운동, 몬스터)" onChange={(e) => set('content', e.target.value)} aria-label="내용" />
     </div>
     <div className="tk-add-row">
-      {periodKind && <label><input type="checkbox" checked={form.limitOn} onChange={(e) => set('limitOn', e.target.checked)} /> 제한 (N회 넘기면 벌금)</label>}
+      {periodKind && <label className="tk-check"><input type="checkbox" checked={form.limitOn} onChange={(e) => set('limitOn', e.target.checked)} /> 제한 (N회 넘기면 벌금)</label>}
       {isLimit && <label>최대 <input type="number" min={0} max={50} value={form.limit} onChange={(e) => set('limit', e.target.value)} />회</label>}
       {!isLimit && (form.kind === 'Weekly' || form.kind === 'Monthly') &&
         <label>목표 <input type="number" min={1} max={form.kind === 'Weekly' ? 7 : 31} value={form.count} onChange={(e) => set('count', e.target.value)} />회</label>}
       {form.kind === 'Routine' && <span className="tk-days">{WEEKDAY_NAMES.map((d) =>
-        <label key={d}><input type="checkbox" checked={form.days.includes(d)} onChange={(e) => set('days', e.target.checked ? [...form.days, d] : form.days.filter((x) => x !== d))} />{d}</label>)}</span>}
+        <label key={d} className="tk-check tk-day"><input type="checkbox" checked={form.days.includes(d)} onChange={(e) => set('days', e.target.checked ? [...form.days, d] : form.days.filter((x) => x !== d))} />{d}</label>)}</span>}
       {form.kind === 'Interval' && <label><input type="number" min={1} max={365} value={form.interval} onChange={(e) => set('interval', e.target.value)} />일마다</label>}
       {form.kind === 'OneTime' && <label>마감 <input type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} /></label>}
-      {!isLimit && <label><input type="checkbox" checked={form.photo} onChange={(e) => set('photo', e.target.checked)} /> 사진 필수 (디스코드에서만 인증)</label>}
+      {!isLimit && <label className="tk-check"><input type="checkbox" checked={form.photo} onChange={(e) => set('photo', e.target.checked)} /> 사진 필수 (디스코드에서만 인증)</label>}
     </div>
     <div className="tk-add-row">
       {form.content && error && <span className="tk-note">{error}</span>}
@@ -88,10 +88,10 @@ function EditPlanForm({ plan, run, onDone }) {
       {keys.includes('count') && <label>목표 <input type="number" min={1} max={plan.category === 'Weekly' ? 7 : 31} value={form.count} onChange={(e) => set('count', e.target.value)} />회</label>}
       {keys.includes('limit') && <label>{LIMIT_PERIOD_KR[plan.period]} 최대 <input type="number" min={0} max={50} value={form.limit} onChange={(e) => set('limit', e.target.value)} />회</label>}
       {keys.includes('days') && <span className="tk-days">{WEEKDAY_NAMES.map((d) =>
-        <label key={d}><input type="checkbox" checked={form.days.includes(d)} onChange={(e) => set('days', e.target.checked ? [...form.days, d] : form.days.filter((x) => x !== d))} />{d}</label>)}</span>}
+        <label key={d} className="tk-check tk-day"><input type="checkbox" checked={form.days.includes(d)} onChange={(e) => set('days', e.target.checked ? [...form.days, d] : form.days.filter((x) => x !== d))} />{d}</label>)}</span>}
       {keys.includes('interval') && <label><input type="number" min={1} max={365} value={form.interval} onChange={(e) => set('interval', e.target.value)} />일마다</label>}
       {keys.includes('deadline') && <label>마감 <input type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} /></label>}
-      {keys.includes('photo') && <label><input type="checkbox" checked={!!form.photo} onChange={(e) => set('photo', e.target.checked)} /> 사진 필수</label>}
+      {keys.includes('photo') && <label className="tk-check"><input type="checkbox" checked={!!form.photo} onChange={(e) => set('photo', e.target.checked)} /> 사진 필수</label>}
     </div>
     <div className="tk-add-row">
       {error && <span className="tk-note">{error}</span>}

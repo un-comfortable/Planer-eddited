@@ -14,7 +14,7 @@ BOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BOT_DIR))
 
 PROJECT = "demo-planer-security"
-os.environ.update(TOKEN="test", TARGET_CHANNEL="1", ALERT_CHANNEL="2", TEST_CHANNEL="3", WELCOME_CHANNEL="4",
+os.environ.update(TOKEN="test", ALERT_CHANNEL="2", WELCOME_CHANNEL="4",
                   FIREBASE_PROJECT_ID=PROJECT)
 if not os.getenv("FIRESTORE_EMULATOR_HOST"):
     pytest.exit("FIRESTORE_EMULATOR_HOST가 없습니다. 에뮬레이터에서 실행하세요: npm run test:bot", returncode=2)
